@@ -1,0 +1,28 @@
+---
+title: "LookAtData"
+author: "Søren Orm Hansen"
+date: "10/19/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+```{r}
+df1 <- read.table("logfiles/readingP2_5-01.csv", header = TRUE, sep = ",")
+df2 <- read.table("logfiles/readingP2_5-02.csv", header = TRUE, sep = ",")
+df3 <- read.table("logfiles/readingP2_5-03.csv", header = TRUE, sep = ",")
+df4 <- read.table("logfiles/readingP2_5-04.csv", header = TRUE, sep = ",")
+df5 <- read.table("logfiles/readingP2_5-05.csv", header = TRUE, sep = ",")
+df6 <- read.table("logfiles/readingP2_5-06.csv", header = TRUE, sep = ",")
+
+df <- cbind(df1,df1$Reaction.time,df2$Reaction.time,df3$Reaction.time,df4$Reaction.time,df5$Reaction.time)
+
+
+
+```
+
