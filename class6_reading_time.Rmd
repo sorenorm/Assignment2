@@ -1,0 +1,205 @@
+---
+title: "Class 6"
+author: "Telma Peura"
+date: "2019 M10 19"
+output: html_document
+---
+
+# Reading Times Experiment - part 2
+### with acknowledgements to Kristian Tyl?n
+
+## preparing R: libraries etc
+```{r}
+library(pacman)
+p_load(tidyverse)
+
+```
+
+# Which features (if any) affect reading time?
+
+In this exercise we will investigate whether different properties of words  affect word-by-word reading times. For this purpose we will use your logfiles from the reading experiment and the MRC Psycholinguistics Database (http://websites.psychology.uwa.edu.au/school/MRCDatabase/uwa_mrc.htm). 
+
+
+Make sure that you have downloaded the database (called "MRC_database.csv"") from Blackboard to your working directory. Also you should choose a logfile from the reading experiment that you want to work with.
+
+# Step 1: Preparing the dataframe
+
+## 1.1. Import the database into R, as well as your chosen logfile
+```{r}
+# read the files into R
+
+df1 <- read.table("logfiles/readingP2_5-01.csv", header = TRUE, sep = ",")
+df2 <- read.table("logfiles/readingP2_5-02.csv", header = TRUE, sep = ",")
+df3 <- read.table("logfiles/readingP2_5-03.csv", header = TRUE, sep = ",")
+df4 <- read.table("logfiles/readingP2_5-04.csv", header = TRUE, sep = ",")
+df5 <- read.table("logfiles/readingP2_5-05.csv", header = TRUE, sep = ",")
+df6 <- read.table("logfiles/readingP2_5-06.csv", header = TRUE, sep = ",")
+df7 <- read.table("logfiles/readingP2_5-07.csv", header = TRUE, sep = ",")
+df8 <- read.table("logfiles/readingP2_5-08.csv", header = TRUE, sep = ",")
+
+df <- rbind(df1,df2,df3,df4,df5,df6,df7,df8)
+
+MRC <- read.table("MRC_database.csv", header = TRUE, sep = ",")
+
+
+
+```
+
+## 1.2. Capitalize all the words in your logfile. 
+
+If you look at the MRC dataframe, all the words are capitalized. YOu should therefore do the same to your logfile. Check out the function toupper() to do that.
+
+NB! Make sure the word column is called "word" as the word column in the MRC dataframe. You can do it by replacing the old name: 
+colnames(your_df)[colnames(your_df)=="old name"] <- "word"
+
+```{r}
+# rename the capitalized column to "word"
+
+colnames(df)[colnames(df)=="Word"] <- "word"
+
+# convert your words into uppercase
+
+df$word<- toupper(df$word)
+
+```
+
+## 1.3. Add word properties from the database to your reading experiment dataframe
+
+Now we are ready to get properties of the words in our text from the database. We do this by merging the two dataframes, the reding experiment logfile and the database using the word column as "key". This means that R will search the database for those words that are identical between the text and the database and add columns for these words to our dataframe. For this we use the function merge(data1, data2, by = "key column").
+
+```{r}
+# merge the dfs 
+df$word <- str_replace_all(df$word, pattern="[.'?+’,:‘;-]", replacement="")
+
+
+dfM <- merge(df, MRC, by = "word")
+
+dfM$wl <- nchar(dfM$word)
+
+df$wl <- nchar(df$word)
+
+?filter()
+
+anddf <- filter(dfM$word=AND)
+
+```
+
+# Step 2: Exploring relations
+
+Now we can explore the relation between reading times and different aspects of words using the skills you've learned in EM1 (correlation and scatter plots). 
+
+Perform at least two exploratory tests between reading time and a selected variable from the database. 
+
+```{r}
+# check assumptions
+
+# transform variables if necessary
+
+# run correlation tests
+
+
+
+round(stat.desc(dfM$Reaction.time, basic = F, norm = T), digits = 2)
+
+round(stat.desc(dfM$wl, basic = F, norm = T), digits = 2)
+
+ggplot(dfM, aes(sample = Reaction.time)) + 
+  stat_qq() + 
+  stat_qq_line() +
+  labs(title = "QQ plot of Reaction_Time with Normal Line",
+       y = "RT", 
+       x = "Expected value"
+       ) +
+  theme_minimal()
+
+#new
+ggplot(dfM, aes(sample = wl)) + 
+  stat_qq() + 
+  stat_qq_line() +
+  labs(title = "QQ plot of wordlength with Normal Line",
+       y = "wordlength", 
+       x = "Expected value"
+       ) +
+  theme_minimal()
+
+
+ggplot(dfM, aes(x = Reaction.time)) +
+  geom_vline(data=dfM, 
+             aes(xintercept = mean(Reaction.time)+3*sd(Reaction.time)), 
+             colour="black", 
+             linetype="dotted") +
+  geom_histogram(
+    aes(y = ..density..),
+    color = "darkblue",
+    fill = "lightblue",
+    binwidth = 0.01
+  ) +
+  stat_function(
+    fun = dnorm,
+    args = list(
+      mean = mean(dfM$Reaction.time, na.rm = TRUE),
+      sd = sd(dfM$Reaction.time, na.rm = TRUE)
+    ),
+    colour = "black",
+    size = 1
+  ) + 
+  labs(title = "Density Plot of Reaction_Time with Normal Line",
+           y = "Density", 
+           x = "Reaction_Time (sec)"
+           ) + 
+  theme_minimal()
+
+
+
+```
+
+```{r}
+my.formula <- y ~ x
+
+ggplot(dfM, aes(x =wl, y = Reaction.time)) +
+  geom_point(size = 2) +
+  geom_smooth(method = lm) +
+  labs(title = "Scatter Plot - wordlength by Reaction_Time",
+       y = "Reaction_Time",
+       x = "wordlength") +
+  stat_poly_eq(formula = my.formula,
+               aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
+               parse = TRUE) +
+  theme_minimal()
+
+#new
+
+ggplot(dfM, aes(x =kf_freq, y = Reaction.time)) +
+  geom_point(size = 2) +
+  geom_smooth(method = lm) +
+  labs(title = "Scatter Plot - wordlength by Reaction_Time",
+       y = "Reaction_Time",
+       x = "wordlength") +
+  stat_poly_eq(formula = my.formula,
+               aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
+               parse = TRUE) +
+  theme_minimal()
+
+
+
+
+```
+
+
+
+
+
+# Step 3: Visualize with ggplot
+```{r}
+# try out different visualizations
+
+```
+
+
+In addition, try to compare length of words and word frequency. What do you find and why?
+
+```{r}
+
+```
+
+

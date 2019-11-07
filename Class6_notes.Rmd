@@ -1,0 +1,298 @@
+---
+title: "Class6_notes"
+author: "Anita"
+date: "10/28/2019"
+output: html_document
+---
+
+## Welcome to Class 6!
+
+Today we will learn how to perform a **t-test** on your reading experiment data! You can watch this youtube video for a recap on what a t-test is: https://www.youtube.com/watch?v=0Pd3dc1GcHc&t=443s 
+
+  (R Markdown tips: ** around words make them bold in the markdown output, while * makes them in italics) 
+
+### Set up 
+
+1) Make sure to 'Save as' this R markdown file into some folder on your computer - once you saved it somewhere, this folder will be **your working directory**. Ideally, it is the folder of your currently open project, but it's completely up to you, as long as you know where to find this markdown file!
+
+2) Make sure that your folder with data from the reading experiment is in **your working directory** too. Move it there if it isn't. To make it easier for yourself, name the folder with data 'data'
+
+3) It's a good idea to have Class4_notes open nearby, so you can reuse your old code! 
+
+4) We will need libraries: tidyverse, pastecs, WRS2. Install them if you don't have them yet.
+
+```{r setup}
+
+library(pacman)
+
+pacman::p_load(tidyverse, data.table, pastecs, WRS2, plyr)
+
+```
+
+
+### Part 1: importing data from a list of files
+We have asked you to collect data from several participants, which means your data is contained in several log files. While you could manually read in data from every file separately, we can do it much faster thanks to the following functions:
+
+  list.files() which produces a character vector (list) of the names of files in the named directory 
+  
+  laplly() which applies a function of our choice to each element in a list ( map() function from purr package does the same )
+  
+  read_csv() which reads csv files into a *tibble*. This function is very similar to read.csv() that reads files into a *dataframe*. Tibbles are apparently just a better version of dataframes (you can read more about it here: https://cran.r-project.org/web/packages/tibble/vignettes/tibble.html)
+  
+  bind_rows() which binds multiple data frames (or tibbles) by row (adds rows of one dataframe to rows of other dataframe)
+
+```{r}
+#get a vector with names of files using list.files() 
+files <- list.files(path = "logfiles",     #PUT THE NAME OF YOUR FOLDER WITH DATA in the quotes, it also might need '/' in the end, experiment with it :)
+                    pattern = ".csv",  #everything that contains '.csv' in its name will be listed
+                    full.names = T)    #makes it include directory path, so instead of 'logfile_1.csv' it will be 'data/logfile_1.csv')
+
+#read all the files into a tibble (a fancy df)
+# apply read_csv() to every element in files list and send the resulting tibbles to the 
+#next line
+    #bind rows from resulting tibbles together so you have one dataset with all of your data
+data <- lapply(files, read.csv) %>% 
+  rbind.fill()
+
+
+data$RT2 <- ifelse(is.na(data$Reaction.time), data$Reaction_Time, data$Reaction.time) 
+data3 <- data %>% select(-c(Reaction_Time, Reaction.time))
+
+data1 <- data %>% filter(is.na(Reaction.time)) %>% dplyr::rename(RT = "Reaction_Time") %>% 
+  select(-Reaction.time)
+data2 <- data %>% filter(is.na(Reaction_Time)) %>% dplyr::rename(RT = "Reaction.time") %>% 
+  select(-Reaction_Time)
+df <- rbind(data1, data2)
+
+write.csv(df, file="reading_time")
+
+?write.csv
+
+
+```
+
+
+
+### Part 2: hands-on t-test in R
+Find documentation for the t.test() function using ? or help(), look through it.
+
+t.test(Continuous outcome variable ~ Categorical predictor varibale, data = dataFrame, paired = FALSE/TRUE, var.equal = FALSE/TRUE)
+
+As you can see, there are different arguments you can change to tailor the t.test to your needs and data. We will go through the default version of t.test and the arguments that you can change!
+
+2.1 Independent Welch t-test (*default*): t.test(Measure ~ Group, data = dataFrame/tibble)
+If you just add variables and dataset it comes from, t.test() function performs Welch Two Sample t-test, which is an independent (unpaired) t-test. It requires your data to be normally distributed in both groups and allows variances in these groups to be different.
+
+```{r}
+#Try performing the default t-test using formula: Measure ~ Group
+#Example (you might need to change dataframe name and variable names)
+t.test(RT ~ Gender, data = df)
+
+```
+
+
+2.2 Independent Student's t-test: t.test(Measure ~ Group, data = , var.equal = T)
+'var.equal' argument is a logical variable indicating whether to treat the two variances as being equal. When set to true, your variances are assumed to be equal in two groups, and test becomes a Student's t-test. It assumes that the two populations have normal distributions with equal variances. 
+
+```{r}
+#change 'var.equal' argument to True to perform a student's t-test, rather than the default Welch's
+
+t.test(RT ~ Gender, data = df, var.equal=TRUE)
+
+t.test(RT ~ Stimulus, data = df, var.equal=TRUE)
+
+```
+
+
+2.3 A paired t-test: t.test(Measure ~ Group, data = , paired = T)
+'paired' argument indicates whether you want a paired t-test (aka repeated measures: both group 1 and group 2 consist of the same participants). It's meaningless in the context of our study, but you can try to run it anyway. 
+More information can be found: http://www.sthda.com/english/wiki/paired-samples-t-test-in-r 
+```{r}
+#set 'paired' argument to True to perform a paired (dependent) t-test (might not work due to our experimental design)
+
+#t.test(RT ~ Gender, data = df, paired = TRUE)
+
+```
+
+
+2.4 A one sample t-test: t.test(df$Measure, mu = )
+mu is a number indicating the true value of the mean. One-sample t-test is used to compare the mean of one sample to a known standard (or theoretical/hypothetical) mean (mu). Generally, the theoretical mean comes from either a previous experiment or from specifics of your experimental design. 
+More information: http://www.sthda.com/english/wiki/one-sample-t-test-in-r
+```{r}
+t.test(df$RT, mu = 0.5)  #a one sample t-test: is mean of our sample different from the theoretical mean of 0.5
+
+#Try to change mu values and see if/how output changes
+
+```
+
+All of the tests above require our data to be normally distributed. What to do when it's not the case?
+
+2.5 t-tests from the WRS2 package allow us to 'trim' tails of our data distribution to deal with non-normal distributions  (usually the lowest 20% and the highest 20% are discarded, but you can change it in the 'tr' argument). 
+
+  2.5.1  Independent t-test: WRS2::yuen(Measure ~ Group, data = data)
+```{r}
+#An example 
+WRS2::yuen(RT ~ Gender, data = df)
+```
+  
+  2.5.2 Paired t-test: WRS2::yuend(x, y, tr = 0.2)
+```{r}
+#probably won't work since our experiment was not actually repeated measures design, so I commented it out
+#WRS2::yuen(data$Reaction_Time, data$Gender, tr =0.2) 
+```
+  
+
+### Part 3: Your Reading Data Analysis
+3.1 Checking Assumptions: are your data normally distributed?
+Give a visual and statistical answer by making a histiogram, qqplot and normality test from pastecs::stat.desc (**remember that you can reuse your Class4_notes and other old code**)
+
+Note that you need to check assumptions for reading time data in condition 1 and condition 2 separately, since those represent data from different groups! How can you do that? 
+
+  Hint: filter() function might help. 
+
+```{r}
+ggplot(df, aes(x = RT)) +
+  geom_vline(data=df, 
+             aes(xintercept = mean(RT)+3*sd(RT)), 
+             colour="black", 
+             linetype="dotted") +
+  geom_histogram(
+    aes(y = ..density..),
+    color = "darkblue",
+    fill = "lightblue",
+    binwidth = .001
+  ) +
+  stat_function(
+    fun = dnorm,
+    args = list(
+      mean = mean(df$RT, na.rm = TRUE),
+      sd = sd(df$RT, na.rm = TRUE)
+    ),
+    colour = "black",
+    size = 1
+  ) + 
+  labs(title = "Density Plot of RT Times with Normal Line",
+           y = "Density", 
+           x = "RT (sec)"
+           ) + 
+  theme_minimal()
+
+#QQ
+ggplot(df, aes(sample = RT)) + 
+  stat_qq() + 
+  stat_qq_line() +
+  labs(title = "QQ plot of RT with Normal Line",
+       y = "wordlength", 
+       x = "Expected value"
+       ) +
+  theme_minimal()
+
+round(stat.desc(df$RT[0:5000], basic = F, norm = T), digits = 2)
+
+shapiro.test(df$RT[0:5000])
+
+```
+
+
+3.2 Transformation of data (if needed)
+First, remove obvious outliers in the data. Then try to apply a transformation to the data to make them normally distributed. It's a common practice to log-transform reaction time data, does it work for you?
+```{r}
+
+df$RTlog <- c(log(df$RT))
+
+ggplot(df, aes(x = RTlog)) +
+  geom_vline(data=df, 
+             aes(xintercept = mean(RTlog)+3*sd(RTlog)), 
+             colour="black", 
+             linetype="dotted") +
+  geom_histogram(
+    aes(y = ..density..),
+    color = "darkblue",
+    fill = "lightblue",
+    binwidth = .001
+  ) +
+  stat_function(
+    fun = dnorm,
+    args = list(
+      mean = mean(df$RTlog, na.rm = TRUE),
+      sd = sd(df$RTlog, na.rm = TRUE)
+    ),
+    colour = "black",
+    size = 1
+  ) + 
+  labs(title = "Density Plot of RTlog Times with Normal Line",
+           y = "Density", 
+           x = "RTlog (sec)"
+           ) + 
+  theme_minimal()
+
+ggplot(df, aes(sample = RTlog)) + 
+  stat_qq() + 
+  stat_qq_line() +
+  labs(title = "QQ plot of RTlog with Normal Line",
+       y = "wordlength", 
+       x = "Expected value"
+       ) +
+  theme_minimal()
+
+round(stat.desc(df$RTlog[0:5000], basic = F, norm = T), digits = 2)
+
+
+```
+
+
+3.3 T-test
+Perform a t-test to test if there is a significant difference in reading time between conditions of your experiment. If you performed previous assumptions check and data transformation on subsets of data, make sure you perform the t-test on the whole dataset that contains both conditions and potentially your transformed reaction time variable.
+```{r}
+t.test(RTlog ~ Stimulus, data = df, var.equal=TRUE)
+
+
+2.71828182846^(-0.9331692)
+
+2.71828182846^(-0.7728293)
+
+```
+
+
+3.4 Visualize the results. 
+For that, make a plot that demonstrates the mean value of reading time in two conditions with corresponding error bars. It could be for example a bar plot or box plot or violin plot with marks of the mean values (you can reuse code from Class4_notes if you want). Remember that ggplot wants your condition variable to be a factor to plot data in 2 different groups. 
+
+```{r}
+ggplot(df,
+       aes(x = Stimulus, y = RT)) +
+  geom_bar(
+    stat = 'summary',
+    fun.y = mean,
+    width = 0.5,
+    color = "Black"
+  ) +
+  stat_summary(
+    fun.data = mean_cl_normal,
+    geom = "errorbar",
+    color = "Black",
+    width = 0.1
+  ) +
+  theme_minimal() + 
+  labs(title = "Barplot of RT by Stimulus", 
+       x = "Stimulus", 
+       y = "RT"
+  )
+```
+
+3.5 Report the results
+
+Example: *Using an independent t-test, we found that the unexpected word did not significantly increase reading time of the word, t(7.66) = 0.46, p > .05, r = 0.16, (M exp = 0.45, M unexp = 0.49)*
+
+M exp and M unexp stand for the mean values in 2 groups, in this case Expected Condition and Unexpected Condition. You can definitely change the way you want to refer to different groups in your experiment. 
+
+
+
+### Part 4 (optional): Extra for your reading data analysis
+
+4.1 Try and compare the results of Welch’s t-test with the results of Student’s t-test. How do they compare?
+
+4.2 T-test can also be made as a linear model (see Fields 9.4.2) try it out and see if you get similar results (you extract the output from a saved linear model using summary())
+
+4.3.Try to run correlation analysis for reading time and word length, now that you have more data (**consider reusing Class5_notes for that**)
+
+

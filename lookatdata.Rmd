@@ -7,6 +7,13 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+knitr::opts_chunk$set(echo = TRUE, include = TRUE)
+
+library(pacman)
+
+pacman::p_load(tidyverse, data.table, lme4, car, ggplot2, pastecs, psych, plotrix, ggpmisc)
+
 ```
 
 ## R Markdown
@@ -19,10 +26,180 @@ df3 <- read.table("logfiles/readingP2_5-03.csv", header = TRUE, sep = ",")
 df4 <- read.table("logfiles/readingP2_5-04.csv", header = TRUE, sep = ",")
 df5 <- read.table("logfiles/readingP2_5-05.csv", header = TRUE, sep = ",")
 df6 <- read.table("logfiles/readingP2_5-06.csv", header = TRUE, sep = ",")
+df7 <- read.table("logfiles/readingP2_5-07.csv", header = TRUE, sep = ",")
+df8 <- read.table("logfiles/readingP2_5-08.csv", header = TRUE, sep = ",")
 
-df <- cbind(df1,df1$Reaction.time,df2$Reaction.time,df3$Reaction.time,df4$Reaction.time,df5$Reaction.time)
+df <- rbind(df1,df2,df3,df4,df5,df6,df7,df8)
 
 
 
 ```
+
+
+```{r}
+df$Word <- as.character(df$Word)
+
+df$WordLength <- nchar(df$Word)
+
+
+round(stat.desc(df$Word, basic = F, norm = T), digits = 2)
+
+round(stat.desc(df$WordLength, basic = F, norm = T), digits = 2)
+
+ggplot(df, aes(sample = Reaction.time)) + 
+  stat_qq() + 
+  stat_qq_line() +
+  labs(title = "QQ plot of Reaction_Time with Normal Line",
+       y = "RT", 
+       x = "Expected value"
+       ) +
+  theme_minimal()
+
+#new
+ggplot(df, aes(sample = WordLength)) + 
+  stat_qq() + 
+  stat_qq_line() +
+  labs(title = "QQ plot of wordlength with Normal Line",
+       y = "wordlength", 
+       x = "Expected value"
+       ) +
+  theme_minimal()
+
+
+ggplot(df, aes(x = Reaction.time)) +
+  geom_vline(data=df, 
+             aes(xintercept = mean(Reaction.time)+3*sd(Reaction.time)), 
+             colour="black", 
+             linetype="dotted") +
+  geom_histogram(
+    aes(y = ..density..),
+    color = "darkblue",
+    fill = "lightblue",
+    binwidth = 0.01
+  ) +
+  stat_function(
+    fun = dnorm,
+    args = list(
+      mean = mean(df$Reaction.time, na.rm = TRUE),
+      sd = sd(df$Reaction.time, na.rm = TRUE)
+    ),
+    colour = "black",
+    size = 1
+  ) + 
+  labs(title = "Density Plot of Reaction_Time with Normal Line",
+           y = "Density", 
+           x = "Reaction_Time (sec)"
+           ) + 
+  theme_minimal()
+
+round(stat.desc(df$RT, basic = F, norm = T), digits = 2)
+```
+
+```{r}
+cor.test(df$Reaction.time, df$WordLength, method = 'pearson')
+```
+
+
+```{r}
+my.formula <- y ~ x
+
+ggplot(df, aes(x =WordLength, y = Reaction.time)) +
+  geom_point(size = 2) +
+  geom_smooth(method = lm) +
+  labs(title = "Scatter Plot - wordlength by Reaction_Time",
+       y = "Reaction_Time",
+       x = "wordlength") +
+  stat_poly_eq(formula = my.formula,
+               aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
+               parse = TRUE) +
+  theme_minimal()
+
+
+
+```
+
+```{r}
+df$WLRT <- c(df$Reaction.time/df$WordLength)
+
+
+
+
+```
+
+
+
+```{r}
+ggplot(df, aes(x = WLRT)) +
+  geom_vline(data=df, 
+             aes(xintercept = mean(WLRT)+3*sd(WLRT)), 
+             colour="black", 
+             linetype="dotted") +
+  geom_histogram(
+    aes(y = ..density..),
+    color = "darkblue",
+    fill = "lightblue",
+    binwidth = 0.01
+  ) +
+  stat_function(
+    fun = dnorm,
+    args = list(
+      mean = mean(df$WLRT, na.rm = TRUE),
+      sd = sd(df$WLRT, na.rm = TRUE)
+    ),
+    colour = "black",
+    size = 1
+  ) + 
+  labs(title = "Density Plot of Reaction_Time with Normal Line",
+           y = "Density", 
+           x = "Reaction_Time (sec)"
+           ) + 
+  theme_minimal()
+
+
+g_by_ID <- group_by(df,ID)
+
+
+
+ggplot(g_by_ID,
+       aes(x = X, y = WLRT)) +
+  geom_line(size = 1) +
+  labs(title = "Scatter Plot",
+       y = "wordlength/reading time",
+       x = "# word in the experiment") +
+  theme_minimal()
+
+
+stim2 <- filter(df, Stimulus=="2")
+
+stim1 <- filter(df, Stimulus=="1")
+
+
+ggplot(stim2,
+       aes(x = X, y = WLRT)) +
+  geom_line(size = 1) +
+  labs(title = "Scatter Plot",
+       y = "wordlength/reading time",
+       x = "# word in the experiment") +
+  theme_minimal()
+
+ggplot(stim1,
+       aes(x = X, y = WLRT)) +
+  geom_line(size = 1) +
+  labs(title = "Scatter Plot",
+       y = "wordlength/reading time",
+       x = "# word in the experiment") +
+  theme_minimal()
+
+
+```
+
+
+
+
+
+
+
+
+
+
 

@@ -1,7 +1,7 @@
 #Title: Portfolio 2
 #Date: 07.10.2019
 #Author: Lærke Kyed Reese Andersen 
-
+ 
 #Reading library
 from psychopy import visual, core, event, gui
 import glob
