@@ -64,7 +64,7 @@ data2 <- data %>% filter(is.na(Reaction_Time)) %>% dplyr::rename(RT = "Reaction.
   select(-Reaction_Time)
 df <- rbind(data1, data2)
 
-write.csv(df, file="reading_time")
+write.csv(df, file="reading_time.csv")
 
 ?write.csv
 

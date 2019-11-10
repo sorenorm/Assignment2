@@ -1,0 +1,353 @@
+---
+title: "Assignment 3"
+author: "Søren Orm Hansen"
+date: "7/11/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+knitr::opts_chunk$set(echo = TRUE, include = TRUE)
+
+library(pacman)
+
+pacman::p_load(tidyverse, data.table, pastecs, WRS2, plyr)
+
+
+
+
+```
+
+## Portfolio exam - Part 3
+
+#### Write a short data analysing report on the data colected using the Reading Time Experiment from Portifolio exam - Part 2 
+
+First of all, I have to import the Reading Time Data, and the MRC data set:
+
+```{r Loading the data}
+#loading the data
+
+files <- list.files(path = "logfiles", 
+                    pattern = ".csv",
+                    full.names = T) 
+
+data <- lapply(files, read.csv) %>% 
+  rbind.fill()
+
+data1 <- data %>% filter(is.na(Reaction.time)) %>% dplyr::rename(rt = "Reaction_Time") %>% 
+  select(-Reaction.time)
+data2 <- data %>% filter(is.na(Reaction_Time)) %>% dplyr::rename(rt = "Reaction.time") %>% 
+  select(-Reaction_Time)
+df <- rbind(data1, data2)
+
+MRC <- read.csv("MRC_database.csv", header = TRUE, sep = ",")
+
+```
+
+Then I have to tidy up the data a bit, and merge the Reading Time Data set withe the MRC data set:
+
+```{r Tiding the data}
+#tiding up the data
+
+colnames(df)[colnames(df)=="Word"] <- "word"
+
+df$word <- str_replace_all(df$word, pattern="[.'?+’,:‘;-]", replacement="")
+
+df$word<- toupper(df$word)
+
+#merging the two data sets
+
+dfM <- merge(df, MRC, by = "word")
+
+```
+
+Let's have a look at the data:
+
+```{r First look at data}
+#histogram
+ggplot(dfM, aes(x = rt)) +
+  geom_vline(data=dfM, 
+             aes(xintercept = mean(rt)+3*sd(rt)), 
+             colour="black", 
+             linetype="dotted") +
+  geom_vline(data=dfM, 
+             aes(xintercept = mean(rt)-3*sd(rt)), 
+             colour="black", 
+             linetype="dotted") +
+  geom_histogram(
+    aes(y = ..density..),
+    color = "darkblue",
+    fill = "lightblue",
+    binwidth = .001
+  ) +
+  stat_function(
+    fun = dnorm,
+    args = list(
+      mean = mean(dfM$rt, na.rm = TRUE),
+      sd = sd(dfM$rt, na.rm = TRUE)
+    ),
+    colour = "black",
+    size = 1
+  ) + 
+  labs(title = "Density Plot of rt Times with Normal Line",
+           y = "Density", 
+           x = "rt (sec)"
+           ) + 
+  theme_minimal()
+
+#QQ for merged data
+ggplot(dfM, aes(sample = rt)) + 
+  stat_qq() + 
+  stat_qq_line() +
+  labs(title = "QQ plot of rt with Normal Line",
+       y = "wordlength", 
+       x = "Expected value"
+       ) +
+  theme_minimal()
+
+```
+
+Since the data is reaction (reading) time, it is expected to be positively skewed - as we see on the desity plot above. Later in the assingment I will be running Pearson's correlation test, has to be normally distribuated in order to meet the assumptions of the test, therefore I have to transform the data. First by removing outliers The two dotted lines indicate the value 3 standard diviations above the mean of the sample, thus I can assume that the values above these lines are outliers and filter them out of the data set:
+
+```{r Outliers}
+#getting rid of outliers
+
+dfMO <- filter(dfM, rt > mean(rt)-3*sd(rt) & rt < mean(rt)+3*sd(rt)) 
+
+```
+
+Let's have a look at the new data set:
+
+```{r Second look at data}
+#histogram
+ggplot(dfMO, aes(x = rt)) +
+  geom_vline(data=dfMO, 
+             aes(xintercept = mean(rt)+3*sd(rt)), 
+             colour="black", 
+             linetype="dotted") +
+    geom_vline(data=dfMO, 
+             aes(xintercept = mean(rt)-3*sd(rt)), 
+             colour="black", 
+             linetype="dotted") +
+  geom_histogram(
+    aes(y = ..density..),
+    color = "darkblue",
+    fill = "lightblue",
+    binwidth = .001
+  ) +
+  stat_function(
+    fun = dnorm,
+    args = list(
+      mean = mean(dfMO$rt, na.rm = TRUE),
+      sd = sd(dfMO$rt, na.rm = TRUE)
+    ),
+    colour = "black",
+    size = 1
+  ) + 
+  labs(title = "Density Plot of rt Times with Normal Line",
+           y = "Density", 
+           x = "rt (sec)"
+           ) + 
+  theme_minimal()
+
+#QQ for merged data
+ggplot(dfMO, aes(sample = rt)) + 
+  stat_qq() + 
+  stat_qq_line() +
+  labs(title = "QQ plot of rt with Normal Line",
+       y = "wordlength", 
+       x = "Expected value"
+       ) +
+  theme_minimal()
+
+
+```
+
+The data already looks more normal, but there is still a heavy positive skew. Let's transfor the data:
+
+```{r Transformation}
+
+dfMO$rtLog <- c(log(dfMO$rt))
+
+```
+
+Let's see what it did to the data:
+
+```{r Third look at data}
+#histogram for log'ed data
+ggplot(dfMO, aes(x = rtLog)) +
+  geom_vline(data=dfMO, 
+             aes(xintercept = mean(rtLog)+3*sd(rtLog)),
+             colour="black", 
+             linetype="dotted") +
+  geom_vline(data=dfMO, 
+             aes(xintercept = mean(rtLog)-3*sd(rtLog)),
+             colour="black", 
+             linetype="dotted") +
+  geom_histogram(
+    aes(y = ..density..),
+    color = "darkblue",
+    fill = "lightblue",
+    binwidth = .01
+  ) +
+  stat_function(
+    fun = dnorm,
+    args = list(
+      mean = mean(dfMO$rtLog, na.rm = TRUE),
+      sd = sd(dfMO$rtLog, na.rm = TRUE)
+    ),
+    colour = "black",
+    size = 1
+  ) + 
+  labs(title = "Density Plot of rt Times with Normal Line",
+           y = "Density", 
+           x = "rt (sec)"
+           ) + 
+  theme_minimal()
+
+#QQ-plot log'ed data
+ggplot(dfMO, aes(sample = rtLog)) + 
+  stat_qq() + 
+  stat_qq_line() +
+  labs(title = "QQ plot of rt with Normal Line",
+       y = "wordlength", 
+       x = "Expected value"
+       ) +
+  theme_minimal()
+
+
+
+```
+
+
+```{r normalising data to account for individual reading times}
+g_by_ID <- group_by(dfM, ID)
+
+m <- mean(g_by_ID$rt)
+
+```
+
+
+##Part 1: Which properties of words correlate with word-by-word reading times?
+
+I will conduct three iterations of correlation analysis, each addressing one of the following three
+word properties: word length, word frequency, and word number.
+
+####First iteration
+
+First, I'll conduct a correlation analysis between reading times and word length:
+
+```{r}
+ggplot(dfMO, aes(nlet, rtLog)) + 
+  geom_point() + 
+  geom_smooth(method = lm) +
+  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)')
+
+cor.test(dfMO$nlet, dfMO$rtLog)
+
+```
+
+Comment
+
+####Second iteration
+
+Second, I'll conduct three correlation analysis' between reading times and word frequencies:
+
+```{r}
+ggplot(dfMO, aes(kf_freq, rtLog)) + 
+  geom_point() + 
+  geom_smooth(method = lm) + #fit the best straight line to the data
+  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)')
+
+
+ggplot(dfMO, aes(tl_freq, rtLog)) + 
+  geom_point() + 
+  geom_smooth(method = lm) + #fit the best straight line to the data
+  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)')
+
+
+ggplot(dfMO, aes(brown_freq, rtLog)) + 
+  geom_point() + 
+  geom_smooth(method = lm) + #fit the best straight line to the data
+  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)')
+
+cor.test(dfMO$kf_freq, dfMO$rtLog)
+
+cor.test(dfMO$tl_freq, dfMO$rtLog)
+
+cor.test(dfMO$brown_freq, dfMO$rtLog)
+
+
+
+
+```
+
+
+####Word Number
+
+Third, Ill conduct a correlation analysis between reading time and when the word occured in the text:
+
+```{r}
+ggplot(dfMO, aes(X, rtLog)) + 
+  geom_point() + 
+  geom_smooth(method = lm) + #fit the best straight line to the data
+  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)')
+
+cor.test(dfMO$X, dfMO$rtLog)
+
+
+```
+
+##Part 2: How do semantic-contextual expectations affect reading times?
+
+
+
+```{r}
+HJdf <- filter(dfMO, X == "160")
+
+t.test(rt ~ word, data = HJdf, var.equal=TRUE)
+
+ggplot(HJdf,
+       aes(
+         x = HJdf$word,
+         y = HJdf$rt,
+         fill = word
+       )) +
+  geom_boxplot(width = 0.5) +
+  stat_summary(
+    fun.y = mean,
+    geom = "point",
+    shape = 23,
+    colour = "Black"
+  ) +
+  geom_errorbar(
+    aes(width = 0.2,
+      ymin = mean(HJdf$rt) - sd(HJdf$rt),
+      ymax = mean(HJdf$rt) + sd(HJdf$rt)
+    ) ) +
+          theme_minimal()
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

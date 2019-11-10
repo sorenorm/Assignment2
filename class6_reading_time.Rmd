@@ -80,7 +80,7 @@ df$wl <- nchar(df$word)
 
 ?filter()
 
-anddf <- filter(dfM$word=AND)
+anddf <- filter(dfM$word=="AND")
 
 ```
 
