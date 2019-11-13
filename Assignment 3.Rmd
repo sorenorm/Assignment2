@@ -16,7 +16,6 @@ pacman::p_load(tidyverse, data.table, pastecs, WRS2, plyr)
 
 
 
-
 ```
 
 ## Portfolio exam - Part 3
@@ -79,7 +78,7 @@ ggplot(dfM, aes(x = rt)) +
     aes(y = ..density..),
     color = "darkblue",
     fill = "lightblue",
-    binwidth = .001
+    binwidth = .01
   ) +
   stat_function(
     fun = dnorm,
@@ -134,7 +133,7 @@ ggplot(dfMO, aes(x = rt)) +
     aes(y = ..density..),
     color = "darkblue",
     fill = "lightblue",
-    binwidth = .001
+    binwidth = .01
   ) +
   stat_function(
     fun = dnorm,
@@ -164,7 +163,7 @@ ggplot(dfMO, aes(sample = rt)) +
 
 ```
 
-The data already looks more normal, but there is still a heavy positive skew. Let's transfor the data:
+The data already looks more normal, but there is still a heavy positive skew. Let's transform the data:
 
 ```{r Transformation}
 
@@ -211,7 +210,7 @@ ggplot(dfMO, aes(sample = rtLog)) +
   stat_qq() + 
   stat_qq_line() +
   labs(title = "QQ plot of rt with Normal Line",
-       y = "wordlength", 
+       y = "Reading time (log)", 
        x = "Expected value"
        ) +
   theme_minimal()
@@ -220,13 +219,7 @@ ggplot(dfMO, aes(sample = rtLog)) +
 
 ```
 
-
-```{r normalising data to account for individual reading times}
-g_by_ID <- group_by(dfM, ID)
-
-m <- mean(g_by_ID$rt)
-
-```
+As we see on the density plot, the data now approximates a normal distribution. This is also to be found in the qq-plot. There are some values under the expected line in the lower end of the plot, and some values above the line in the higher end of the plot, but overall the values seem to approximately follow the line. We could also have run a test for normality on the data, but with so many observations the test wouldn't work very well.
 
 
 ##Part 1: Which properties of words correlate with word-by-word reading times?
@@ -242,7 +235,8 @@ First, I'll conduct a correlation analysis between reading times and word length
 ggplot(dfMO, aes(nlet, rtLog)) + 
   geom_point() + 
   geom_smooth(method = lm) +
-  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)')
+  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)') +
+  theme_minimal()
 
 cor.test(dfMO$nlet, dfMO$rtLog)
 
@@ -258,19 +252,22 @@ Second, I'll conduct three correlation analysis' between reading times and word 
 ggplot(dfMO, aes(kf_freq, rtLog)) + 
   geom_point() + 
   geom_smooth(method = lm) + #fit the best straight line to the data
-  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)')
+  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)') +
+  theme_minimal()
 
 
 ggplot(dfMO, aes(tl_freq, rtLog)) + 
   geom_point() + 
   geom_smooth(method = lm) + #fit the best straight line to the data
-  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)')
+  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)') +
+  theme_minimal()
 
 
 ggplot(dfMO, aes(brown_freq, rtLog)) + 
   geom_point() + 
   geom_smooth(method = lm) + #fit the best straight line to the data
-  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)')
+  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)') +
+  theme_minimal()
 
 cor.test(dfMO$kf_freq, dfMO$rtLog)
 
@@ -292,7 +289,8 @@ Third, Ill conduct a correlation analysis between reading time and when the word
 ggplot(dfMO, aes(X, rtLog)) + 
   geom_point() + 
   geom_smooth(method = lm) + #fit the best straight line to the data
-  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)')
+  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)') +
+  theme_minimal()
 
 cor.test(dfMO$X, dfMO$rtLog)
 
@@ -306,12 +304,17 @@ cor.test(dfMO$X, dfMO$rtLog)
 ```{r}
 HJdf <- filter(dfMO, X == "160")
 
-t.test(rt ~ word, data = HJdf, var.equal=TRUE)
+ggplot(HJdf, aes(word, rtLog)) + 
+  geom_point() + 
+  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)') +
+  theme_minimal()
+
+t.test(rtLog ~ word, data = HJdf, var.equal=TRUE)
 
 ggplot(HJdf,
        aes(
          x = HJdf$word,
-         y = HJdf$rt,
+         y = HJdf$rtLog,
          fill = word
        )) +
   geom_boxplot(width = 0.5) +
@@ -322,12 +325,11 @@ ggplot(HJdf,
     colour = "Black"
   ) +
   geom_errorbar(
-    aes(width = 0.2,
-      ymin = mean(HJdf$rt) - sd(HJdf$rt),
-      ymax = mean(HJdf$rt) + sd(HJdf$rt)
-    ) ) +
-          theme_minimal()
-
+    stat = 'summary', 
+    fun.data = mean_cl_normal, 
+    width = 0.2
+    ) +
+  theme_minimal()
 
 
 ```
