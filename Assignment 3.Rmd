@@ -1,7 +1,7 @@
 ---
 title: "Assignment 3"
 author: "Søren Orm Hansen"
-date: "7/11/2019"
+date: "13/11/2019"
 output: html_document
 ---
 
@@ -12,9 +12,7 @@ knitr::opts_chunk$set(echo = TRUE, include = TRUE)
 
 library(pacman)
 
-pacman::p_load(tidyverse, data.table, pastecs, WRS2, plyr)
-
-
+pacman::p_load(tidyverse, data.table, pastecs, WRS2, plyr, car, WRS2)
 
 ```
 
@@ -22,41 +20,43 @@ pacman::p_load(tidyverse, data.table, pastecs, WRS2, plyr)
 
 #### Write a short data analysing report on the data colected using the Reading Time Experiment from Portifolio exam - Part 2 
 
-First of all, I have to import the Reading Time Data, and the MRC data set:
+First of all, I have to import the Reading Time Data - collected by having 25 participants (9 receiving stimulus 1 and 16 receiving stimulus 2) go through the Reading Time Experiment from Portfolio Exam - part 2, and the MRC data set:
 
 ```{r Loading the data}
-#loading the data
-
+#getting a list of the file names
 files <- list.files(path = "logfiles", 
                     pattern = ".csv",
                     full.names = T) 
 
+#loading the data
 data <- lapply(files, read.csv) %>% 
   rbind.fill()
 
+#correcting errors
 data1 <- data %>% filter(is.na(Reaction.time)) %>% dplyr::rename(rt = "Reaction_Time") %>% 
   select(-Reaction.time)
 data2 <- data %>% filter(is.na(Reaction_Time)) %>% dplyr::rename(rt = "Reaction.time") %>% 
   select(-Reaction_Time)
 df <- rbind(data1, data2)
 
+#reading the MRC data set
 MRC <- read.csv("MRC_database.csv", header = TRUE, sep = ",")
 
 ```
 
-Then I have to tidy up the data a bit, and merge the Reading Time Data set withe the MRC data set:
+Then I have to tidy up the data a bit, and merge the Reading Time dataset withe the MRC dataset:
 
 ```{r Tiding the data}
-#tiding up the data
-
+#changing the collum name
 colnames(df)[colnames(df)=="Word"] <- "word"
 
+#removing punctuation
 df$word <- str_replace_all(df$word, pattern="[.'?+’,:‘;-]", replacement="")
 
+#making the letters capital
 df$word<- toupper(df$word)
 
 #merging the two data sets
-
 dfM <- merge(df, MRC, by = "word")
 
 ```
@@ -67,11 +67,11 @@ Let's have a look at the data:
 #histogram
 ggplot(dfM, aes(x = rt)) +
   geom_vline(data=dfM, 
-             aes(xintercept = mean(rt)+3*sd(rt)), 
+             aes(xintercept = mean(rt)+2.56*sd(rt)), 
              colour="black", 
              linetype="dotted") +
   geom_vline(data=dfM, 
-             aes(xintercept = mean(rt)-3*sd(rt)), 
+             aes(xintercept = mean(rt)-2.56*sd(rt)), 
              colour="black", 
              linetype="dotted") +
   geom_histogram(
@@ -89,138 +89,25 @@ ggplot(dfM, aes(x = rt)) +
     colour = "black",
     size = 1
   ) + 
-  labs(title = "Density Plot of rt Times with Normal Line",
+  labs(title = "Density Plot of Reading Time with Normal Line",
            y = "Density", 
-           x = "rt (sec)"
+           x = "Reading Time (sec)"
            ) + 
   theme_minimal()
 
-#QQ for merged data
+#QQ-plot
 ggplot(dfM, aes(sample = rt)) + 
   stat_qq() + 
   stat_qq_line() +
-  labs(title = "QQ plot of rt with Normal Line",
-       y = "wordlength", 
-       x = "Expected value"
+  labs(title = "QQ Plot of Reading Time with Normal Line",
+       y = "Reading Time (sec)", 
+       x = "Expected Value"
        ) +
   theme_minimal()
 
 ```
 
-Since the data is reaction (reading) time, it is expected to be positively skewed - as we see on the desity plot above. Later in the assingment I will be running Pearson's correlation test, has to be normally distribuated in order to meet the assumptions of the test, therefore I have to transform the data. First by removing outliers The two dotted lines indicate the value 3 standard diviations above the mean of the sample, thus I can assume that the values above these lines are outliers and filter them out of the data set:
-
-```{r Outliers}
-#getting rid of outliers
-
-dfMO <- filter(dfM, rt > mean(rt)-3*sd(rt) & rt < mean(rt)+3*sd(rt)) 
-
-```
-
-Let's have a look at the new data set:
-
-```{r Second look at data}
-#histogram
-ggplot(dfMO, aes(x = rt)) +
-  geom_vline(data=dfMO, 
-             aes(xintercept = mean(rt)+3*sd(rt)), 
-             colour="black", 
-             linetype="dotted") +
-    geom_vline(data=dfMO, 
-             aes(xintercept = mean(rt)-3*sd(rt)), 
-             colour="black", 
-             linetype="dotted") +
-  geom_histogram(
-    aes(y = ..density..),
-    color = "darkblue",
-    fill = "lightblue",
-    binwidth = .01
-  ) +
-  stat_function(
-    fun = dnorm,
-    args = list(
-      mean = mean(dfMO$rt, na.rm = TRUE),
-      sd = sd(dfMO$rt, na.rm = TRUE)
-    ),
-    colour = "black",
-    size = 1
-  ) + 
-  labs(title = "Density Plot of rt Times with Normal Line",
-           y = "Density", 
-           x = "rt (sec)"
-           ) + 
-  theme_minimal()
-
-#QQ for merged data
-ggplot(dfMO, aes(sample = rt)) + 
-  stat_qq() + 
-  stat_qq_line() +
-  labs(title = "QQ plot of rt with Normal Line",
-       y = "wordlength", 
-       x = "Expected value"
-       ) +
-  theme_minimal()
-
-
-```
-
-The data already looks more normal, but there is still a heavy positive skew. Let's transform the data:
-
-```{r Transformation}
-
-dfMO$rtLog <- c(log(dfMO$rt))
-
-```
-
-Let's see what it did to the data:
-
-```{r Third look at data}
-#histogram for log'ed data
-ggplot(dfMO, aes(x = rtLog)) +
-  geom_vline(data=dfMO, 
-             aes(xintercept = mean(rtLog)+3*sd(rtLog)),
-             colour="black", 
-             linetype="dotted") +
-  geom_vline(data=dfMO, 
-             aes(xintercept = mean(rtLog)-3*sd(rtLog)),
-             colour="black", 
-             linetype="dotted") +
-  geom_histogram(
-    aes(y = ..density..),
-    color = "darkblue",
-    fill = "lightblue",
-    binwidth = .01
-  ) +
-  stat_function(
-    fun = dnorm,
-    args = list(
-      mean = mean(dfMO$rtLog, na.rm = TRUE),
-      sd = sd(dfMO$rtLog, na.rm = TRUE)
-    ),
-    colour = "black",
-    size = 1
-  ) + 
-  labs(title = "Density Plot of rt Times with Normal Line",
-           y = "Density", 
-           x = "rt (sec)"
-           ) + 
-  theme_minimal()
-
-#QQ-plot log'ed data
-ggplot(dfMO, aes(sample = rtLog)) + 
-  stat_qq() + 
-  stat_qq_line() +
-  labs(title = "QQ plot of rt with Normal Line",
-       y = "Reading time (log)", 
-       x = "Expected value"
-       ) +
-  theme_minimal()
-
-
-
-```
-
-As we see on the density plot, the data now approximates a normal distribution. This is also to be found in the qq-plot. There are some values under the expected line in the lower end of the plot, and some values above the line in the higher end of the plot, but overall the values seem to approximately follow the line. We could also have run a test for normality on the data, but with so many observations the test wouldn't work very well.
-
+The data is non-normal with a heavy positive skew, but that is to be expected when dealing with reaction (reading) time data.
 
 ##Part 1: Which properties of words correlate with word-by-word reading times?
 
@@ -229,93 +116,298 @@ word properties: word length, word frequency, and word number.
 
 ####First iteration
 
-First, I'll conduct a correlation analysis between reading times and word length:
+First, I'll conduct a correlation analysis between reading times and word length.
+
+Since the word lenght is a discrete variable and not a continious variable, I will use the non-parametric Spearman's test for correlation on the non-normally distributed reading time data:
 
 ```{r}
-ggplot(dfMO, aes(nlet, rtLog)) + 
+#spearman's correlation test
+cor.test(dfM$nlet, dfM$rt, method = "spearman")
+
+#scatter plot of the data from the correlation test
+ggplot(dfM, aes(nlet, rt)) + 
   geom_point() + 
   geom_smooth(method = lm) +
-  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)') +
+  labs(title = "Plot of Correlation between Reading Time and Word Lenght with Normal Line",
+           y = "Reading Time (sec)", 
+           x = "Word Lenght"
+           ) + 
   theme_minimal()
-
-cor.test(dfMO$nlet, dfMO$rtLog)
-
 ```
 
-Comment
+The time it took to read a given word was found to be insignificantly correlated with the length of the word, r(4923) =0.008, p > .05.
 
 ####Second iteration
 
-Second, I'll conduct three correlation analysis' between reading times and word frequencies:
+Second, I'll conduct a correlation analysis between reading times and word frequencies:
+
+In the MRC data set, there are two different measurements of written word-frequencies; Kucera-Francis (kf) and Thorndike-Lorge (tl). The text our reading time data is based on contains words that are not present in neither the kf corpus nor in the tl corpus (the words, that have a frequency of 0). Naturally, I will chose the corpus with the biggest overlap with the text the reading time data is based on.
 
 ```{r}
-ggplot(dfMO, aes(kf_freq, rtLog)) + 
-  geom_point() + 
-  geom_smooth(method = lm) + #fit the best straight line to the data
-  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)') +
-  theme_minimal()
+#selecting the observations where kf=0
+kf_freq <- filter(dfM, kf_freq == 0)
 
+#selecting the observations where tl=0
+tl_freq <- filter(dfM, tl_freq == 0)
 
-ggplot(dfMO, aes(tl_freq, rtLog)) + 
-  geom_point() + 
-  geom_smooth(method = lm) + #fit the best straight line to the data
-  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)') +
-  theme_minimal()
+#number of observations where kf=0 divided by the number of participants
+length(kf_freq$X)/25
 
-
-ggplot(dfMO, aes(brown_freq, rtLog)) + 
-  geom_point() + 
-  geom_smooth(method = lm) + #fit the best straight line to the data
-  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)') +
-  theme_minimal()
-
-cor.test(dfMO$kf_freq, dfMO$rtLog)
-
-cor.test(dfMO$tl_freq, dfMO$rtLog)
-
-cor.test(dfMO$brown_freq, dfMO$rtLog)
-
-
-
+#number of observations where tl=0 divided by the number of participants
+length(tl_freq$X)/25
 
 ```
 
+It was found, that the kf corpus contains biggest overlap with the text used in the experiment (kf contains 4 words without a frequency compared with the tl, that contains 15 words without a frequency).
+
+I will now remove the words, that does not have a frequency in the kf corpus:
+
+```{r}
+#removing the observations without a kf frequency
+freq_cor <- filter(dfM, kf_freq > 0)
+
+```
+
+Let's look at the distribution of the frequencies:
+
+```{r}
+#histogram
+ggplot(freq_cor, aes(x = kf_freq)) +
+  geom_vline(data=freq_cor, 
+             aes(xintercept = mean(kf_freq)+2.56*sd(kf_freq)),
+             colour="black", 
+             linetype="dotted") +
+  geom_vline(data=freq_cor, 
+             aes(xintercept = mean(kf_freq)-2.56*sd(kf_freq)),
+             colour="black", 
+             linetype="dotted") +
+  geom_histogram(
+    aes(y = ..density..),
+    color = "darkblue",
+    fill = "lightblue",
+    binwidth = 500
+  ) +
+  stat_function(
+    fun = dnorm,
+    args = list(
+      mean = mean(freq_cor$kf_freq, na.rm = TRUE),
+      sd = sd(freq_cor$kf_freq, na.rm = TRUE)
+    ),
+    colour = "black",
+    size = 1
+  ) + 
+  labs(title = "Density Plot of kf-frequency with Normal Line",
+           y = "Density", 
+           x = "kf-frequency"
+           ) + 
+  theme_minimal()
+
+#QQ-plot kf-freq
+ggplot(freq_cor, aes(sample = kf_freq)) + 
+  stat_qq() + 
+  stat_qq_line() +
+  labs(title = "QQ plot of kf-frequency with Normal Line",
+       y = "kf-frequency", 
+       x = "Expected Value"
+       ) +
+  theme_minimal()
+
+```
+
+Since the kf-frequencies are not normally distributed (the data obviously doesn't look normal and there are too many observations to run a meaningful test for normality), I will use the Spearman's test for correlation:
+
+```{r}
+#spearman's correlation test
+cor.test(freq_cor$kf_freq, freq_cor$rt, method = "spearman")
+
+#scatter plot of the data from the correlation test
+ggplot(freq_cor, aes(kf_freq, rt)) + 
+  geom_point() + 
+  geom_smooth(method = lm) +
+  labs(title = "Plot of Correlation between Reading Time and kf-frequency with Normal Line",
+           y = "Reading Time (sec)", 
+           x = "kf-frequency"
+           ) + 
+  theme_minimal()
+```
+
+The time it took to read a given word was found to be insignificantly correlated with the kf-frequnecy of the word, r(4823) =-0.018, p > .05.
 
 ####Word Number
 
-Third, Ill conduct a correlation analysis between reading time and when the word occured in the text:
+Third, I'll conduct a correlation analysis between reading time and when the word occured in the text:
+
+Since the word number is a discrete variable and not a continuous variable, I will use the non-parametric Spearman's test for correlation on the non-normally distributed reading time data: 
 
 ```{r}
-ggplot(dfMO, aes(X, rtLog)) + 
+#spearman's correlation test
+cor.test(dfM$X, dfM$rt, method = "spearman")
+
+#scatter plot of the data from the correlation test
+ggplot(dfM, aes(X, rt)) + 
   geom_point() + 
-  geom_smooth(method = lm) + #fit the best straight line to the data
-  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)') +
+  geom_smooth(method = lm) +
+  labs(title = "Plot of Correlation between Reading Time and Word Number with Normal Line",
+           y = "Reading Time (sec)", 
+           x = "Word Number"
+           ) + 
   theme_minimal()
-
-cor.test(dfMO$X, dfMO$rtLog)
-
 
 ```
 
+The time it took to read a given word was found to be significantly correlated with how late the word appeared in the text, r(4923) = -0.079, p < .001.
+
 ##Part 2: How do semantic-contextual expectations affect reading times?
 
+I will conduct a contrastive analysis of the two conditions in your reading experiment (where
+condition #2 corresponds to the text with the semantically surprising word - bees making juice instead of honey). I will single out the specific reading time for the target words (honey and juice) as well as the following word. I will compare the means of the reading times for those words (independently) across conditions using the appropriate type of t-test.
 
+The salient word in the reading time experiment was bees making 'juice' instead of 'honey'. Honey and juice have the same length and approximately the same kf-frequencies (25 and 11 respectively - also neither the frequency nor the word lenght was found earlier to be significantly correlated with reading times).
+
+First, I create a new dataframe with only the word that occured in position 160 - where participants in condition 1 saw 'honey' and participants in condition 2 saw 'juice' - and the following word 'and':
 
 ```{r}
-HJdf <- filter(dfMO, X == "160")
+HJdf <- filter(dfM, X == "160" |  X == "161")
+```
 
-ggplot(HJdf, aes(word, rtLog)) + 
-  geom_point() + 
-  ggtitle('Scatter plot with the regression line: quicker using geom_smooth (method lm)') +
+Then I check the assumptions for the t-test:
+
+The data is continious. It needs to be normally distributed, and have homogeneity of variance.
+
+First, I test for normality:
+
+```{r}
+#descriptive statistic
+round(stat.desc(HJdf$rt, basic = F, norm = T), digits = 2)
+
+#QQ-plot
+ggplot(HJdf, aes(sample = rt)) + 
+  stat_qq() + 
+  stat_qq_line() +
+  labs(title = "QQ plot of Reading Time with Normal Line",
+       y = "Reading Time (log)", 
+       x = "Expected Value"
+       ) +
   theme_minimal()
 
-t.test(rtLog ~ word, data = HJdf, var.equal=TRUE)
+#histogram
+ggplot(HJdf, aes(x = rt)) +
+  geom_vline(data=HJdf, 
+             aes(xintercept = mean(rt)+2.56*sd(rt)),
+             colour="black", 
+             linetype="dotted") +
+  geom_vline(data=HJdf, 
+             aes(xintercept = mean(rt)-2.56*sd(rt)),
+             colour="black", 
+             linetype="dotted") +
+  geom_histogram(
+    aes(y = ..density..),
+    color = "darkblue",
+    fill = "lightblue",
+    binwidth = .07
+  ) +
+  stat_function(
+    fun = dnorm,
+    args = list(
+      mean = mean(HJdf$rt, na.rm = TRUE),
+      sd = sd(HJdf$rt, na.rm = TRUE)
+    ),
+    colour = "black",
+    size = 1
+  ) + 
+  labs(title = "Density Plot of Reading Time with Normal Line",
+           y = "Density", 
+           x = "Reading Time (sec)"
+           ) + 
+  theme_minimal()
+```
 
+To summarise, the mean and the median differ by almost 20%, there are possible outliers (2.56 sd from the mean), the skew.2SE exceeds the interval from -1 to 1, and the p-value of the Shapiro-Wilk test is equal to 0.0 - indicating non-normality - so in order to use the t-test, I will have to transform the data:
+
+```{r}
+#transforming data using the natrual logarithm
+HJdf$rtLog<- c(log(HJdf$rt))
+
+```
+
+Let's have a look at the transformed data:
+
+```{r}
+#descriptive statistic
+round(stat.desc(HJdf$rtLog, basic = F, norm = T), digits = 2)
+
+#QQ-plot sqrt'ed data
+ggplot(HJdf, aes(sample = rtLog)) + 
+  stat_qq() + 
+  stat_qq_line() +
+  labs(title = "QQ plot of rtLog with Normal Line",
+       y = "Reading time (log)", 
+       x = "Expected value"
+       ) +
+  theme_minimal()
+
+#histogram
+ggplot(HJdf, aes(x = rtLog)) +
+  geom_vline(data=HJdf, 
+             aes(xintercept = mean(rtLog)+2.56*sd(rtLog)),
+             colour="black", 
+             linetype="dotted") +
+  geom_vline(data=HJdf, 
+             aes(xintercept = mean(rtLog)-2.56*sd(rtLog)),
+             colour="black", 
+             linetype="dotted") +
+  geom_histogram(
+    aes(y = ..density..),
+    color = "darkblue",
+    fill = "lightblue",
+    binwidth = .07
+  ) +
+  stat_function(
+    fun = dnorm,
+    args = list(
+      mean = mean(HJdf$rtLog, na.rm = TRUE),
+      sd = sd(HJdf$rtLog, na.rm = TRUE)
+    ),
+    colour = "black",
+    size = 1
+  ) + 
+  labs(title = "Density Plot of Reading Time with Normal Line",
+           y = "Density", 
+           x = "Reading Time (log(sec))"
+           ) + 
+  theme_minimal()
+```
+
+Now, the mean and the median are almost equal, there are no posible outliers (2.56 sd from the mean), the skew.2SE and the kurt.2SE are both wihtin the interval from -1 to 1, the p-value of the Shapiro-Wilk test is way above 0.05, and the values on the qq-plot follows the expected line neatly - indicating normality. This means, that I can use the t-test on my data.
+
+In the experiment 9 participants received stimuli 1 and 14 participants revieved stimulus 2, thus the homogeneity of variance is violated, and I'll use the Welch test.
+
+I can now run the Welch two sample t-test:
+
+```{r}
+#t-test
+t.test(rtLog ~ Stimulus, data = HJdf, paired=FALSE)
+
+#finding the standard deviations
+H <- filter(HJdf, Stimulus == 1)
+
+J <- filter(HJdf, Stimulus == 2)
+
+Hsd <- sd(H$rtLog)
+
+Jsd <- sd(J$rtLog)
+
+Hsd
+
+Jsd
+
+#boxplot
 ggplot(HJdf,
        aes(
-         x = HJdf$word,
+         x = HJdf$Stimulus,
          y = HJdf$rtLog,
-         fill = word
+         fill = Stimulus,
+         group= Stimulus
        )) +
   geom_boxplot(width = 0.5) +
   stat_summary(
@@ -329,25 +421,50 @@ ggplot(HJdf,
     fun.data = mean_cl_normal, 
     width = 0.2
     ) +
+  labs(title = "Box Plot of Reading Time by Stimulus",
+           y = "Reading Time (log(sec))", 
+           x = "Stimulus"
+           ) + 
   theme_minimal()
+```
 
+On average, participants who read the salient word was found to use insignificantly differen log(time) (M = -0.73 , SD = 0.59), compared to participants who read the semantically expected word (M = -0.68, SD = 0.53), t(38.595) = 0.32635, p > .05.
+
+This doesn't tell us much. Let's convert the rtLog values back to reading times
+
+```{r}
+#defining e
+e=2.71828182846
+
+#converting the means back to the original scale
+mean1=e^-0.6756107 
+
+mean2=e^-0.7289529 
+
+#the sd can't just be transformed back like the mean, 
+#but the boundaries of the confidence interval (boundary=mean±2*sd) can be calculated and converted
+#first I calculate the upper and lower boundary of the 95% confidence interval
+cilog1h=-0.6756107+0.5327819*1.96
+cilog1l=-0.6756107-0.5327819*1.96
+
+#then I converte it to the original scale
+ci1h <- e^cilog1h
+ci1l <- e^cilog1l
+
+#The same procedure is applied to the values for stimulus 2
+cilog2h=-0.7289529+0.5918577*1.96
+cilog2l=-0.7289529-0.5918577*1.96
+
+ci2h <- e^cilog2h
+ci2l <- e^cilog2l
+
+res <- c(ci1l, mean1, ci1h, ci2l, mean2, ci2h)
+
+res
 
 ```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+So, on average, participants who read the salient word was found to use insignificantly shorter time (M = 0.48 , CI = 0.15 to 1.54), compared to participants who read the semantically expected word (M = 0.51, CI = 0.18 to 1.45), t(38.595) = 0.32635, p > .05.
 
 
 
